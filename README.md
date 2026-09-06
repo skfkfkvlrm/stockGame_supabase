@@ -121,6 +121,6 @@ npx supabase db reset
 
 ## 🔗 6. 관련 레포지토리
 - 👨‍🎓 학생 포털 프론트엔드: [stockGame_react](https://github.com/skfkfkvlrm/stockGame_react)
-- 👩‍🏫 관리자 포털 프론트엔드: [stockGame_admin_react](https://github.com/skfkfkvlrm/stockGame_admin_react)
+- 👩‍🏫 관리자 포털 프론트엔드: [stockGame-admin-react](https://github.com/skfkfkvlrm/stockGame-admin-react)
 - 🏛️ 레거시 보존 백엔드 (v1): [stockGame_mechanism](https://github.com/skfkfkvlrm/stockGame_mechanism)
 - 📚 마스터 기획서 및 감사 보고서: [skfkfkvlrm-json-lib](https://github.com/skfkfkvlrm/skfkfkvlrm-json-lib)
