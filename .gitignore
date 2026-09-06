@@ -1,0 +1,22 @@
+# Environment files
+.env
+.env*.local
+
+# Supabase temp & branch metadata
+supabase/.temp/
+supabase/.branches/
+
+# Node modules
+node_modules/
+npm-debug.log*
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

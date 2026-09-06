@@ -1,0 +1,30 @@
+{
+  "name": "stockgame-supabase",
+  "version": "1.0.0",
+  "description": "StockGame Next-Gen BaaS Architecture on Supabase",
+  "scripts": {
+    "supabase:init": "supabase init",
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop",
+    "supabase:status": "supabase status",
+    "supabase:reset": "supabase db reset",
+    "supabase:diff": "supabase db diff",
+    "supabase:functions:serve": "supabase functions serve --no-verify-jwt",
+    "supabase:functions:deploy": "supabase functions deploy generate-news"
+  },
+  "keywords": [
+    "stockgame",
+    "supabase",
+    "postgres",
+    "realtime",
+    "trading"
+  ],
+  "author": "StockGame Team",
+  "license": "ISC",
+  "devDependencies": {
+    "supabase": "^2.116.0"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0"
+  }
+}
