@@ -65,7 +65,7 @@ DECLARE
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'admin@stockgame.local') THEN
         INSERT INTO auth.users (
-            id, instance_id, email, encrypted_password, email_confirmed_at, confirmed_at,
+            id, instance_id, email, encrypted_password, email_confirmed_at,
             confirmation_token, recovery_token, email_change, email_change_token_new, email_change_token_current,
             phone_change, phone_change_token, reauthentication_token,
             raw_app_meta_data, raw_user_meta_data, created_at, updated_at, role, aud
@@ -74,7 +74,7 @@ BEGIN
             '00000000-0000-0000-0000-000000000000',
             'admin@stockgame.local',
             crypt('1234', gen_salt('bf')),
-            NOW(), NOW(),
+            NOW(),
             '', '', '', '', '',
             '', '', '',
             '{"provider":"email","providers":["email"]}',
