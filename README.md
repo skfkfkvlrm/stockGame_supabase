@@ -60,6 +60,8 @@ d:\samuel\java\stockGame_supabase/
 ├── supabase/
 │   ├── config.toml                            # Supabase 프로젝트/포트/스튜디오 설정
 │   ├── seed.sql                               # 로컬 개발용 시드 스크립트
+│   ├── reset_21_stocks_and_coupons.sql        # 21개 정식 종목 클린 리셋 및 쿠폰 RPC 배포 스크립트
+│   ├── deploy_cloud_all.sql                   # Supabase Cloud 전체 원터치 통합 배포 DDL
 │   ├── functions/                             # Deno 기반 Edge Functions
 │   │   └── generate-news/                     # 로컬 Ollama(qwen2.5-coder:7b) 연동 시황 뉴스
 │   │       └── index.ts
