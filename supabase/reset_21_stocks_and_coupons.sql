@@ -8,6 +8,8 @@ TRUNCATE TABLE public.order_trades CASCADE;
 TRUNCATE TABLE public.orders CASCADE;
 TRUNCATE TABLE public.user_holdings CASCADE;
 TRUNCATE TABLE public.stock_price_history CASCADE;
+TRUNCATE TABLE public.user_coupons CASCADE;
+DELETE FROM public.coupons;
 
 -- 테스트 종목 (쿰척쿰척 등) 제거
 DELETE FROM public.stocks WHERE name = '쿰척쿰척' OR id > 21;
@@ -59,11 +61,12 @@ VALUES
 (4, 'CPN-2026-0004', '쌤 삥뜯기', 500000, 'ON_SALE'),
 (5, 'CPN-2026-0005', '자율 동아리 간식권', 25000, 'ON_SALE')
 ON CONFLICT (id) DO UPDATE
-SET name = EXCLUDED.name,
+SET coupon_code = EXCLUDED.coupon_code,
+    name = EXCLUDED.name,
     price = EXCLUDED.price,
     status = EXCLUDED.status;
 
-SELECT setval('public.coupons_id_seq', (SELECT GREATEST(5, COALESCE(MAX(id), 0)) FROM public.coupons));
+SELECT setval('public.coupons_id_seq', 5);
 
 -- [Step 4] 쿠폰 구매 원자적 트랜잭션 함수 생성 (buy_coupon)
 CREATE OR REPLACE FUNCTION public.buy_coupon(p_coupon_id BIGINT)
