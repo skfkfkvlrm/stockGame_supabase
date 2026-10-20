@@ -2481,3 +2481,78 @@ ON CONFLICT (name) DO UPDATE SET
     market_status = EXCLUDED.market_status,
     chart_history = EXCLUDED.chart_history,
     updated_at = EXCLUDED.updated_at;
+
+
+-- ========================================================
+-- Section: 20261020000016_clean_zero_share_holdings.sql
+-- Description: Zero-Share Holding Pruning & Proportional Invested Amount Integrity Trigger
+-- ========================================================
+
+-- 1. 기존 잔여 보유 수량이 0인 모든 고스트 레코드 즉시 삭제 청산
+DELETE FROM public.user_holdings
+WHERE amount <= 0 AND locked_amount <= 0;
+
+-- 2. user_holdings 변경 전 무결성 방어 트리거 함수 (BEFORE UPDATE OR INSERT)
+CREATE OR REPLACE FUNCTION public.trg_fn_clean_zero_user_holdings()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.amount <= 0 AND NEW.locked_amount <= 0 THEN
+        NEW.amount := 0;
+        NEW.locked_amount := 0;
+        NEW.total_invested_amount := 0;
+        NEW.average_price := 0;
+    ELSIF (NEW.amount + NEW.locked_amount) > 0 AND NEW.average_price > 0 THEN
+        NEW.total_invested_amount := (NEW.amount + NEW.locked_amount)::BIGINT * NEW.average_price::BIGINT;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_clean_zero_user_holdings ON public.user_holdings;
+CREATE TRIGGER trg_clean_zero_user_holdings
+BEFORE UPDATE OR INSERT ON public.user_holdings
+FOR EACH ROW
+EXECUTE FUNCTION public.trg_fn_clean_zero_user_holdings();
+
+-- 3. 전량 매도 완료된 0주 레코드 자동 정리 트리거 (AFTER UPDATE)
+CREATE OR REPLACE FUNCTION public.trg_fn_delete_zero_user_holdings()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.amount <= 0 AND NEW.locked_amount <= 0 THEN
+        DELETE FROM public.user_holdings WHERE id = NEW.id;
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_delete_zero_user_holdings ON public.user_holdings;
+CREATE TRIGGER trg_delete_zero_user_holdings
+AFTER UPDATE ON public.user_holdings
+FOR EACH ROW
+WHEN (NEW.amount <= 0 AND NEW.locked_amount <= 0)
+EXECUTE FUNCTION public.trg_fn_delete_zero_user_holdings();
+
+-- 4. 관리자 일괄 정리용 유지보수 RPC 함수 신설 (admin_clean_zero_holdings)
+CREATE OR REPLACE FUNCTION public.admin_clean_zero_holdings()
+RETURNS JSONB AS $$
+DECLARE
+    v_deleted_count INT := 0;
+BEGIN
+    IF NOT public.is_admin() AND current_user NOT IN ('postgres', 'supabase_admin') AND auth.role() != 'service_role' THEN
+        RAISE EXCEPTION '관리자 권한이 필요합니다.';
+    END IF;
+
+    WITH deleted_rows AS (
+        DELETE FROM public.user_holdings
+        WHERE amount <= 0 AND locked_amount <= 0
+        RETURNING id
+    )
+    SELECT COUNT(*) INTO v_deleted_count FROM deleted_rows;
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'deletedZeroHoldingsCount', v_deleted_count,
+        'cleanedAt', NOW()
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
