@@ -649,3 +649,70 @@ BEGIN
         'SELECT public.purge_expired_recruiter_sessions(INTERVAL ''7 days'');'
     );
 END $$;
+
+
+-- 6. 데모/채용담당자 원터치 포인트 충전 함수 확장 (recruiter_% 지원)
+CREATE OR REPLACE FUNCTION public.recharge_demo_points(p_amount bigint DEFAULT 1000000)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+DECLARE
+    v_user_id UUID := auth.uid();
+    v_student_id VARCHAR(100);
+    v_current_point BIGINT;
+    v_new_point BIGINT;
+BEGIN
+    IF v_user_id IS NULL THEN
+        RAISE EXCEPTION '로그인이 필요합니다.';
+    END IF;
+
+    IF p_amount IS NULL OR p_amount <= 0 OR p_amount > 10000000 THEN
+        RAISE EXCEPTION '1회 충전 가능 금액은 1 P 이상 10,000,000 P 이하여야 합니다.';
+    END IF;
+
+    SELECT student_id, total_point
+    INTO v_student_id, v_current_point
+    FROM public.profiles
+    WHERE id = v_user_id
+    FOR UPDATE;
+
+    IF v_student_id IS NULL THEN
+        RAISE EXCEPTION '사용자 프로필을 찾을 수 없습니다.';
+    END IF;
+
+    IF v_student_id NOT IN ('demo', 'recruiter') AND v_student_id NOT LIKE 'recruiter_%' AND NOT public.is_admin() THEN
+        RAISE EXCEPTION '데모 체험 전용 기능입니다. 일반 학생 계정은 사용할 수 없습니다.';
+    END IF;
+
+    IF (v_current_point + p_amount) > 100000000 THEN
+        RAISE EXCEPTION '데모 계정 최대 보유 한도(100,000,000 P)를 초과할 수 없습니다. (현재 잔액: % P)', v_current_point;
+    END IF;
+
+    v_new_point := v_current_point + p_amount;
+
+    UPDATE public.profiles
+    SET total_point = v_new_point,
+        updated_at = NOW()
+    WHERE id = v_user_id;
+
+    INSERT INTO public.point_transactions (
+        user_id, amount, balance_after, reason_type, description
+    ) VALUES (
+        v_user_id,
+        p_amount,
+        v_new_point,
+        'DEMO_RECHARGE',
+        '채용담당자 데모 원터치 포인트 충전 (+' || trim(to_char(p_amount, '999,999,999')) || ' P)'
+    );
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'userId', v_user_id,
+        'studentId', v_student_id,
+        'rechargedAmount', p_amount,
+        'totalPoint', v_new_point
+    );
+END;
+$function$;
