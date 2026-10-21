@@ -716,3 +716,54 @@ BEGIN
     );
 END;
 $function$;
+
+-- 7. 전교생 랭킹 산정 (get_student_rankings) - recruiter_% 및 demo 계정 랭킹 집계 제외 필터링
+CREATE OR REPLACE FUNCTION public.get_student_rankings()
+RETURNS TABLE(
+    id UUID,
+    rank BIGINT,
+    student_id TEXT,
+    name TEXT,
+    grade INT,
+    class_name TEXT,
+    class_number INT,
+    total_point BIGINT,
+    total_asset BIGINT,
+    total_coupon INT
+) AS $$
+BEGIN
+    RETURN QUERY
+    WITH stock_eval AS (
+        SELECT 
+            uh.user_id,
+            COALESCE(SUM((uh.amount + uh.locked_amount) * s.current_price), 0)::BIGINT AS eval_total
+        FROM public.user_holdings uh
+        JOIN public.stocks s ON uh.stock_id = s.id
+        GROUP BY uh.user_id
+    )
+    SELECT 
+        p.id,
+        ROW_NUMBER() OVER (ORDER BY (p.total_point + COALESCE(se.eval_total, 0)) DESC, p.student_id ASC) AS rank,
+        p.student_id::TEXT,
+        p.name::TEXT,
+        p.grade,
+        p.class_name::TEXT,
+        p.class_number,
+        p.total_point::BIGINT,
+        (p.total_point + COALESCE(se.eval_total, 0))::BIGINT AS total_asset,
+        p.total_coupon
+    FROM public.profiles p
+    LEFT JOIN stock_eval se ON p.id = se.user_id
+    WHERE p.role = 'ROLE_STUDENT' 
+      AND p.status = 'ACTIVE'
+      AND p.student_id NOT ILIKE '%test%'
+      AND p.student_id != 'demo'
+      AND p.student_id NOT LIKE 'recruiter_%'
+      AND p.name NOT ILIKE '%테스트%'
+      AND p.name NOT ILIKE '%검증%'
+      AND p.name NOT ILIKE '%데모%'
+    ORDER BY rank ASC
+    LIMIT 100;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
