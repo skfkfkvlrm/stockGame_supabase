@@ -204,7 +204,11 @@ BEGIN
 END;
 $function$;
 
--- 3. place_and_match_order 데모 판별 조건에 recruiter_% 확장
+-- 2-1. order_trades LP 양방향 체결 호환성 (시스템 LP 매수/매도 시 buy_order_id, buyer_id NULL 허용)
+ALTER TABLE public.order_trades ALTER COLUMN buy_order_id DROP NOT NULL;
+ALTER TABLE public.order_trades ALTER COLUMN buyer_id DROP NOT NULL;
+
+-- 3. place_and_match_order 데모 판별 조건에 recruiter_% 확장 및 양방향 대칭 LP 유동성 적용
 CREATE OR REPLACE FUNCTION public.place_and_match_order(
     p_stock_id bigint,
     p_order_type character varying,
@@ -450,8 +454,8 @@ BEGIN
             v_remain_qty := v_remain_qty - v_trade_qty;
         END LOOP;
 
-        -- 4-B. 시스템 초기 발행 잔량(LP) 매수 매칭
-        IF v_remain_qty > 0 AND v_pub_balance > 0 AND p_price >= v_pub_price THEN
+        -- 4-B. 일반 학생: 시스템 초기 발행 잔량(LP) 매수 매칭
+        IF NOT v_is_demo AND v_remain_qty > 0 AND v_pub_balance > 0 AND p_price >= v_pub_price THEN
             v_lp_qty := LEAST(v_remain_qty, v_pub_balance);
             v_lp_price := v_pub_price;
             v_lp_total := v_lp_price::BIGINT * v_lp_qty::BIGINT;
@@ -487,6 +491,32 @@ BEGIN
             END IF;
 
             v_remain_qty := v_remain_qty - v_lp_qty;
+        END IF;
+
+        -- 4-C. 데모 및 채용담당자 계정 야간/주말 매수 유동성 즉시 지원 (매도와 완전 대칭, 주문가 그대로 체결)
+        IF v_is_demo IS TRUE AND v_remain_qty > 0 THEN
+            v_lp_qty := v_remain_qty;
+            v_lp_price := p_price;
+            v_lp_total := v_lp_price::BIGINT * v_lp_qty::BIGINT;
+
+            UPDATE public.stocks
+            SET publication_balance = GREATEST(0, publication_balance - v_lp_qty),
+                current_price = v_lp_price,
+                updated_at = NOW()
+            WHERE id = p_stock_id;
+
+            INSERT INTO public.order_trades (stock_id, buy_order_id, sell_order_id, buyer_id, seller_id, price, amount, total_trade_amount)
+            VALUES (p_stock_id, v_new_order_id, NULL, v_user_id, NULL, v_lp_price, v_lp_qty, v_lp_total);
+
+            INSERT INTO public.user_holdings (user_id, stock_id, amount, locked_amount, average_price, total_invested_amount)
+            VALUES (v_user_id, p_stock_id, v_lp_qty, 0, v_lp_price, v_lp_total)
+            ON CONFLICT (user_id, stock_id) DO UPDATE
+            SET total_invested_amount = user_holdings.total_invested_amount + EXCLUDED.total_invested_amount,
+                amount = user_holdings.amount + EXCLUDED.amount,
+                average_price = (user_holdings.total_invested_amount + EXCLUDED.total_invested_amount) / (user_holdings.amount + EXCLUDED.amount),
+                updated_at = NOW();
+
+            v_remain_qty := 0;
         END IF;
 
     ELSIF p_order_type = 'SELL' THEN
