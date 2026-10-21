@@ -11,6 +11,7 @@
     "supabase:diff": "supabase db diff",
     "supabase:functions:serve": "supabase functions serve --no-verify-jwt",
     "supabase:functions:deploy": "supabase functions deploy generate-news",
+    "supabase:functions:deploy:indices": "supabase functions deploy sync-market-indices --no-verify-jwt",
     "sync:indices": "node scripts/sync_market_indices.mjs",
     "sync:indices:watch": "node scripts/sync_market_indices.mjs --watch"
   },
