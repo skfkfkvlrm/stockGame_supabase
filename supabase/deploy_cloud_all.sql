@@ -2556,3 +2556,31 @@ BEGIN
     );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ========================================================
+-- File: 20261021000017_sync_market_indices_cron.sql
+-- ========================================================
+CREATE EXTENSION IF NOT EXISTS pg_net;
+CREATE EXTENSION IF NOT EXISTS pg_cron;
+
+DO $$
+DECLARE
+    v_job_id INT;
+BEGIN
+    SELECT jobid INTO v_job_id FROM cron.job WHERE jobname = 'sync-market-indices-job';
+    IF v_job_id IS NOT NULL THEN
+        PERFORM cron.unschedule(v_job_id);
+    END IF;
+
+    PERFORM cron.schedule(
+        'sync-market-indices-job',
+        '*/10 0-6 * * 1-5',
+        $CRON$
+        SELECT net.http_post(
+            url := 'https://ulgbshgzwmnytejfutsb.supabase.co/functions/v1/sync-market-indices',
+            headers := jsonb_build_object('Content-Type', 'application/json'),
+            body := '{"source": "pg_cron"}'::jsonb
+        );
+        $CRON$
+    );
+END $$;
